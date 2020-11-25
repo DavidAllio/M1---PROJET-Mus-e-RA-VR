@@ -1,0 +1,123 @@
+﻿using HullDelaunayVoronoi.Hull;
+using HullDelaunayVoronoi.Primitives;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using UnityEngine;
+using UnityEngine.UI;
+
+public class SelectPart : MonoBehaviour
+{
+    public Text DebugT;
+    private ConvexHull3 hull;
+
+    // Start is called before the first frame update
+    void Start()
+    {
+
+            Vertex3[] vertices;
+
+            //Lecture du fichier de coordonnées dans un tableau de vertices
+
+
+            UnityEngine.Networking.UnityWebRequest www = UnityEngine.Networking.UnityWebRequest.Get(Path.Combine(Application.streamingAssetsPath, Path.Combine("Models", "mask_048_0.txt")));
+            www.SendWebRequest();
+            while (!www.isDone) { }
+            byte[] loadBytes = www.downloadHandler.data;
+            Debug.Log(loadBytes.Length.ToString());
+
+            string fileContent = System.Text.Encoding.UTF8.GetString(loadBytes);
+
+               
+            string[] linesFromfile = fileContent.Split('\n');
+            string[] cutted_str;
+
+            vertices = new Vertex3[linesFromfile.Length];
+
+            int ind = 0;
+
+            DebugT.text = linesFromfile.Length.ToString();
+
+        foreach (string reader in linesFromfile)
+            {
+                cutted_str = reader.Split(' ');
+                float x = float.Parse(cutted_str[0], CultureInfo.InvariantCulture);
+                float y = float.Parse(cutted_str[1], CultureInfo.InvariantCulture);
+                float z = float.Parse(cutted_str[2], CultureInfo.InvariantCulture);
+                vertices[ind] = new Vertex3(x, y, z);
+                //DebugT.text = "chargement: " + x + " " + y + " " + z;
+                ind++;
+            }
+
+            DebugT.text = "2";
+            //génération de l'enveloppe convexe
+            hull = new ConvexHull3();
+            hull.Generate(vertices);
+            DebugT.text = "3";
+
+            //Conversion de la liste de sommets en mesh
+            List<Vector3> positions = new List<Vector3>();
+            List<Vector3> normals = new List<Vector3>();
+            List<int> indices = new List<int>();
+
+            for (int i = 0; i < hull.Simplexs.Count; i++)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    Vector3 v = new Vector3();
+                    v.x = hull.Simplexs[i].Vertices[j].X;
+                    v.y = hull.Simplexs[i].Vertices[j].Y;
+                    v.z = hull.Simplexs[i].Vertices[j].Z;
+
+                    positions.Add(v);
+                }
+
+                Vector3 n = new Vector3();
+                n.x = hull.Simplexs[i].Normal[0];
+                n.y = hull.Simplexs[i].Normal[1];
+                n.z = hull.Simplexs[i].Normal[2];
+
+                if (hull.Simplexs[i].IsNormalFlipped)
+                {
+                    indices.Add(i * 3 + 2);
+                    indices.Add(i * 3 + 1);
+                    indices.Add(i * 3 + 0);
+                }
+                else
+                {
+                    indices.Add(i * 3 + 0);
+                    indices.Add(i * 3 + 1);
+                    indices.Add(i * 3 + 2);
+                }
+
+                normals.Add(n);
+                normals.Add(n);
+                normals.Add(n);
+            }
+
+            Mesh mesh = new Mesh();
+            mesh.SetVertices(positions);
+            mesh.SetNormals(normals);
+            mesh.SetTriangles(indices, 0);
+
+            mesh.RecalculateBounds();
+
+            //Création d'un objet qui va contenir le meshcollider
+            GameObject partObject = new GameObject("bras");
+
+            //Création du meshcollider à partir du mesh créé précedemment
+            MeshCollider meshCollider = partObject.AddComponent<MeshCollider>();
+            meshCollider.sharedMesh = mesh;
+
+            partObject.transform.parent = transform;
+        
+
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        
+    }
+}
